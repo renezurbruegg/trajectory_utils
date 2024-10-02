@@ -1,0 +1,38 @@
+{
+    "object_metrics": {
+        "parent_frame": "vicon",
+        "child_frame": "vicon/RigidBody",
+        "duration": 10.53333330154419,
+        "total_translation_error": 2.3040432929992676,
+        "rmse_position": 0.1145441010594368,
+        "rmse_rotation": 1.8114583492279053,
+        "acc_1cm_1\u00b0": 0.0,
+        "acc_3cm_3\u00b0": 0.0,
+        "acc_5cm_5\u00b0": 0.0,
+        "acc_10cm_10\u00b0": 0.0
+    },
+    "glasses_metric": {
+        "parent_frame": "vicon",
+        "child_frame": "vicon/AriaGlasses",
+        "duration": 10.53333330154419,
+        "total_translation_error": 0.1738511621952057,
+        "rmse_position": 0.007015109062194824,
+        "rmse_rotation": 0.08234257251024246,
+        "acc_1cm_1\u00b0": 0.0,
+        "acc_3cm_3\u00b0": 0.0,
+        "acc_5cm_5\u00b0": 0.857594907283783,
+        "acc_10cm_10\u00b0": 1.0
+    },
+    "object_in_glasses_metric": {
+        "parent_frame": "vicon/AriaGlasses",
+        "child_frame": "vicon/RigidBody",
+        "duration": 10.53333330154419,
+        "total_translation_error": 2.7340049743652344,
+        "rmse_position": 0.15246227383613586,
+        "rmse_rotation": 1.813238263130188,
+        "acc_1cm_1\u00b0": 0.0,
+        "acc_3cm_3\u00b0": 0.0,
+        "acc_5cm_5\u00b0": 0.0,
+        "acc_10cm_10\u00b0": 0.0
+    }
+}

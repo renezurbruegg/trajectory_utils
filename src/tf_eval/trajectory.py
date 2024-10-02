@@ -2,16 +2,79 @@
 from __future__ import annotations
 
 import torch
-from typing import Sequence, TypeVar
-# from typing_extensions import Self
+from typing import Callable, Sequence, TypeVar
 import roma
-from tf_eval.utils import unitquat_slerp
+from tf_eval.utils.rotation import unitquat_slerp
 import plotly.graph_objects as go
 
 
 Self = TypeVar('Self', bound='Trajectory')
 
 class Trajectory:
+    """Generic class to represent a trajectory in 3D space.
+
+    Methods:
+        slice(start_time: float | None, end_time: float | None, interpolate: bool = False) -> Trajectory:
+            Slices the trajectory based on the given start and end times.
+        inverse() -> Trajectory:
+            Returns the inverse of the trajectory.
+        transform(position: torch.Tensor, orientation: torch.Tensor) -> Trajectory:
+            Transforms the trajectory using the given position and orientation.
+        as_rigid_unit_quat() -> roma.RigidUnitQuat:
+            Converts the trajectory to a rigid unit quaternion representation.
+        clone() -> Trajectory:
+            Creates a deep copy of the trajectory.
+        resample(new_timesteps: Sequence[float] | torch.Tensor | float | None = None, start_time: float | None = None, end_time: float | None = None, frequency: float | None = None, interpolation: str = "linear") -> Trajectory:
+            Resamples the trajectory based on the given parameters.
+        show(fig: go.Figure | None = None, show: bool = True, line_color: str = "blue", show_frames = False, frame_scale = 0.05, trace_kwargs={}, time_as_color:bool = False, colorscale = "viridis") -> go.Figure:
+            Visualizes the trajectory using a 3D plot.
+        temporal_align(other: Trajectory, translation = True, orientation: bool = True, max_delay: float = torch.inf, return_infos = False) -> Trajectory:
+            Temporally aligns the trajectory with another trajectory.
+
+    Internal Attributes:
+        _positions: torch.Tensor
+            The positions of the trajectory.
+        _orientations: torch.Tensor
+            The orientations of the trajectory.
+        _timesteps: torch.Tensor
+            The timestamps of the trajectory.
+        _parent_frame: str
+            The name of the parent frame.
+        _child_frame: str
+            The name of the child frame.
+    
+    Properties:
+        avg_position: torch.Tensor
+            The average position of the trajectory.
+        avg_orientation: torch.Tensor
+            The average orientation of the trajectory.
+        positions: torch.Tensor
+            The positions of the trajectory.
+        orientations: torch.Tensor
+            The orientations of the trajectory.
+        timesteps: torch.Tensor
+            The timestamps of the trajectory.
+        start_time: float
+            The start time of the trajectory.
+        end_time: float
+            The end time of the trajectory.
+        duration: float
+            The duration of the trajectory.
+        parent_frame: str
+            The name of the parent frame.
+        child_frame: str
+            The name of the child frame.
+        euclidean_length: float
+            The euclidean length of the trajectory.
+    
+    Args:
+        positions (list[torch.Tensor] | torch.Tensor): A list of 3D positions or a tensor of shape (N, 3) representing the positions of the trajectory
+        orientations (list[torch.Tensor] | torch.Tensor | None): A list of unit quaternions or a tensor of shape (N, 4) representing the orientations of the trajectory. If None, the orientation is assumed to be the identity quaternion
+        timesteps (list[float] | torch.Tensor): A list of timestamps or a tensor of shape (N,) representing the timestamps of the trajectory
+        parent_frame (str): The name of the parent frame
+        child_frame (str): The name of the child frame
+        """
+
     def __init__(
         self,
         positions: list[torch.Tensor] | torch.Tensor,
@@ -57,7 +120,20 @@ class Trajectory:
         self._parent_frame = parent_frame
         self._child_frame = child_frame
 
+
     def slice(self, start_time: float | None, end_time: float | None, interpolate: bool = False) -> Trajectory:
+        """
+        Slice the trajectory based on the given start and end times.
+        Args:
+            start_time (float | None): The start time of the slice. If None, the start time of the trajectory will be used.
+            end_time (float | None): The end time of the slice. If None, the end time of the trajectory will be used.
+            interpolate (bool, optional): Whether to interpolate the sliced trajectory. Defaults to False.
+        Returns:
+            Trajectory: The sliced trajectory.
+        Raises:
+            NotImplementedError: If interpolation is requested but not yet implemented.
+        """
+
         if interpolate:
             raise NotImplementedError("Interpolation is not yet implemented")
         if start_time is None:
@@ -76,6 +152,22 @@ class Trajectory:
         )
 
     def __getitem__(self, key) -> Trajectory:
+        """Slice the trajectory based on the given key.
+
+        Note, this will spaces strictly based on the index and not the time.
+
+        Example:
+            traj = Trajectory(positions, orientations, timesteps, parent_frame, child_frame)
+            sliced_traj = traj[1:5]
+            # -> This will slice the trajectory from index 1 to 5
+
+        Args:
+            key: The key to slice the trajectory. Either an integer or a slice object.
+        
+        Returns:
+            Trajectory: The sliced trajectory.
+
+        """
         if isinstance(key, slice):
             return Trajectory(
                 self._positions[key],
@@ -94,6 +186,11 @@ class Trajectory:
 
 
     def inverse(self) -> Trajectory:
+        """Returns the inverse of the trajectory, with the parent and child frames swapped, and the positions and orientations inverted.       
+        
+        Returns:
+            Trajectory: The inverse trajectory.
+        """
         inverse = self.as_rigid_unit_quat().inverse()
         return Trajectory(
             inverse.translation,
@@ -104,6 +201,17 @@ class Trajectory:
         )
 
     def transform(self, position: torch.Tensor, orientation: torch.Tensor) -> Trajectory:
+        """Transforms the trajectory using the given position and orientation. 
+        Note this updates the trajectory in place.
+
+        Args:
+            position (torch.Tensor): The position to transform the trajectory to. Should be of shape (3,) or (N, 3).
+            orientation (torch.Tensor): The orientation to transform the trajectory to. Should be of shape (4,) or (N, 4).
+
+        Returns:
+            Trajectory: The transformed trajectory.
+        """
+
         if position.ndim == 1:
             position = position.unsqueeze(0).expand(len(self._positions), -1).to(self._positions.device, self._positions.dtype)
         if orientation.ndim == 1:
@@ -115,6 +223,15 @@ class Trajectory:
         return self
 
     def __matmul__(self, other: Trajectory) -> Trajectory:
+        """Concatenates two trajectories by applying the transformation of the second trajectory to the first trajectory.
+
+        Args:
+            other (Trajectory): The trajectory to concatenate with.
+
+        Returns:
+            Trajectory: The concatenated trajectory.
+        """
+
         if not isinstance(other, Trajectory):
             raise ValueError("Trajectory can only be added to another Trajectory object")
 
@@ -138,10 +255,13 @@ class Trajectory:
            concat.translation, concat.linear, self._timesteps, self._parent_frame, other._child_frame
         )
 
+
     def as_rigid_unit_quat(self) -> roma.RigidUnitQuat:
+        """Converts the trajectory to a rigid unit quaternion representation."""
         return roma.RigidUnitQuat(translation=self._positions, linear=self._orientations)
 
     def clone(self) -> Trajectory:
+        """Creates a deep copy of the trajectory."""
         return Trajectory(
             self._positions.clone(),
             self._orientations.clone(),
@@ -156,8 +276,24 @@ class Trajectory:
         start_time: float | None = None,
         end_time: float | None = None,
         frequency: float | None = None,
-        interpolation: str = "nearest",
+        interpolation: str = "linear",
     ) -> Trajectory:
+        """Resamples the trajectory based on the given parameters.
+        Args:
+            new_timesteps (Sequence[float] | torch.Tensor | float | None, optional): The new timesteps to resample the trajectory to. If not provided, the trajectory will be resampled based on the frequency parameter. Defaults to None.
+            start_time (float | None, optional): The start time of the resampled trajectory. If not provided, the start time of the original trajectory will be used. Defaults to None.
+            end_time (float | None, optional): The end time of the resampled trajectory. If not provided, the end time of the original trajectory will be used. Defaults to None.
+            frequency (float | None, optional): The frequency at which to resample the trajectory. Either new_timesteps or frequency must be provided. Defaults to None.
+            interpolation (str, optional): The interpolation method to use. Supported methods are 'nearest' and 'linear'. Defaults to "linear".
+        Returns:
+            Trajectory: The resampled trajectory.
+        Raises:
+            ValueError: If neither new_timesteps nor frequency is provided.
+            ValueError: If the frequency is too high for the given time range.
+            ValueError: If the time range is 0.
+            ValueError: If the new timesteps are not increasing.
+            ValueError: If the interpolation method is not recognized.
+        """
 
         if new_timesteps is None:
             if frequency is None:
@@ -233,7 +369,21 @@ class Trajectory:
             )
 
     def show(self, fig: go.Figure | None = None, show: bool = True, line_color: str = "blue", show_frames = False, frame_scale = 0.05, trace_kwargs={}, time_as_color:bool = False, colorscale = "viridis") -> go.Figure:
-
+        """
+        Visualizes the trajectory in a 3D plot.
+        Args:
+            fig (go.Figure | None, optional): The figure to add the trajectory to. If None, a new figure will be created. Defaults to None.
+            show (bool, optional): Whether to display the figure. Defaults to True.
+            line_color (str, optional): The color of the trajectory line. Defaults to "blue".
+            show_frames (bool, optional): Whether to show the orientation frames. Defaults to False.
+            frame_scale (float, optional): The scale of the orientation frames. Defaults to 0.05.
+            trace_kwargs (dict, optional): Additional keyword arguments to pass to the go.Scatter3d traces. Defaults to {}.
+            time_as_color (bool, optional): Whether to use time as color. Defaults to False.
+            colorscale (str, optional): The colorscale to use for coloring the trajectory. Defaults to "viridis".
+        Returns:
+            go.Figure: The figure containing the trajectory plot.
+        """
+        
         legendgroup = self._parent_frame + " to " + self._child_frame
 
         if fig is None:
@@ -248,7 +398,11 @@ class Trajectory:
             legendgroup = self._parent_frame + " to " + self._child_frame + f"_{cnter}"
 
         if time_as_color:
-            line_color = self._timesteps
+            if isinstance(time_as_color, Callable):
+                line_color = time_as_color(self._timesteps)
+            else:
+                line_color = self._timesteps
+
         fig.add_trace(
             go.Scatter3d(
                 x=self._positions[:, 0],
@@ -326,7 +480,21 @@ class Trajectory:
 
         return fig
 
-    def temporal_align(self, other: Trajectory, translation = True, orientation: bool = True, max_delay: float = torch.inf) -> Trajectory:
+    def temporal_align(self, other: Trajectory, translation = True, orientation: bool = True, max_delay: float = torch.inf, return_infos = False) -> Trajectory:
+        """
+        Temporally aligns the current trajectory with another trajectory.
+        Args:
+            other (Trajectory): The trajectory to align with.
+            translation (bool, optional): Whether to align the translation. Defaults to True.
+            orientation (bool, optional): Whether to align the orientation. Defaults to True.
+            max_delay (float, optional): The maximum delay allowed for alignment. Defaults to torch.inf.
+            return_infos (bool, optional): Whether to return alignment information. Defaults to False.
+        Returns:
+            Tuple[Trajectory, Trajectory] or Tuple[Trajectory, Trajectory, Dict[str, Any]]: 
+            If return_infos is False, returns a tuple containing the aligned trajectory of the current object and the aligned trajectory of the other object.
+            If return_infos is True, returns a tuple containing the aligned trajectory of the current object, the aligned trajectory of the other object, and a dictionary containing alignment information (rotation, translation, delay).
+        """
+        
         if self.duration < other.duration:
             raise ValueError("The first trajectory must have a longer duration than the second trajectory")
 
@@ -335,6 +503,9 @@ class Trajectory:
         best_error = 1e8
         best_trajectory = None
         best_other = None
+        best_r = None
+        best_t = None
+        best_delay = None
 
         for start_ts in self._timesteps:
             start_ts = start_ts.item()
@@ -342,7 +513,7 @@ class Trajectory:
                 break
 
             reference_traj = self.slice(start_time=start_ts, end_time=start_ts + other.duration).clone()
-            if reference_traj.duration < other.duration:
+            if reference_traj.duration < other.duration - 0.1:
                 break
 
             delay = other_start_ts - reference_traj.start_time
@@ -351,29 +522,62 @@ class Trajectory:
             # resample other trajectory to match the reference trajectory
             other_delayed = other_delayed.resample(reference_traj.timesteps, interpolation="linear")
             # calculate the error after aligning the two trajectories
-            other_delayed = other_delayed.spatial_align(reference_traj, translation=translation, orientation=orientation)
+            other_delayed = other_delayed.spatial_align(reference_traj, translation=translation, orientation=orientation, return_infos=return_infos)
+         
+            if return_infos:
+                other_delayed, r_rotation, t_translation = other_delayed
             error = ((reference_traj.positions - other_delayed.positions)**2).mean()
 
             if error < best_error:
                 best_error = error
                 best_trajectory = reference_traj.clone()
                 best_other = other_delayed.clone()
+                best_delay = delay
 
+                if return_infos:
+                    best_r = roma.rotmat_to_unitquat(r_rotation)
+                    best_t = t_translation
 
+        if return_infos:
+            return best_trajectory, best_other, {"rotation": best_r, "translation": best_t, "delay": best_delay}
         return best_trajectory, best_other
 
-    def spatial_align(self, other: Trajectory, translation:bool = True, orientation:bool = True) -> Trajectory:
+    def spatial_align(self, other: Trajectory, translation:bool = True, orientation:bool = True, return_infos = False) -> Trajectory:
+        """Aligns the current trajectory with another trajectory in terms of translation and/or orientation.
+        
+        Args:
+            other (Trajectory): The trajectory to align with.
+            translation (bool, optional): Whether to align the translation. Defaults to True.
+            orientation (bool, optional): Whether to align the orientation. Defaults to True.
+            return_infos (bool, optional): Whether to return additional alignment information. Defaults to False.
+        Returns:
+            Trajectory: The aligned trajectory.
+        Raises:
+            ValueError: If the timesteps of the two trajectories are not equal.
+        Note:
+            - If `translation` is True and `orientation` is False, only the translation of the trajectory will be aligned.
+            - If `orientation` is True, both translation and orientation will be aligned.
+            - If `return_infos` is True, additional alignment information will be returned.
+        """
+    
 
         if self._timesteps.shape != other.timesteps.shape or not self._timesteps.equal(other.timesteps):
             raise ValueError("The timesteps of the two trajectories are not equal. The trajectories must be resampled to have the same timesteps")
 
         if translation and not orientation:
             print("Warning: Aligning only translation will not change the orientation of the trajectory")
-            positions = self._positions - self.avg_position + other.avg_position
+            t_registration = other.avg_position - self.avg_position
+            positions = self._positions + t_registration
+            R_registration = torch.zeros(len(self._orientations), 4)
+            R_registration[:, -1] = 1
+            if return_infos:
+                return Trajectory(positions, self._orientations, self._timesteps, self._parent_frame, self._child_frame), R_registration, t_registration
             return Trajectory(positions, self._orientations, self._timesteps, self._parent_frame, self._child_frame)
 
         if orientation:
             R_registration, t_registration = roma.rigid_points_registration(self._positions, other.positions)
+            if return_infos:
+                return self.clone().transform(t_registration, roma.rotmat_to_unitquat(R_registration)), R_registration, t_registration
             return self.clone().transform(t_registration, roma.rotmat_to_unitquat(R_registration))
         return self
 
@@ -421,6 +625,10 @@ class Trajectory:
     def parent_frame(self):
         return self._parent_frame
 
+    @parent_frame.setter
+    def parent_frame(self, value: str):
+        self._parent_frame = value
+        
     @property
     def child_frame(self):
         return self._child_frame

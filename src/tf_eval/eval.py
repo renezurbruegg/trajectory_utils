@@ -9,12 +9,12 @@ from prettytable import PrettyTable
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-def compare_trajectories(traj1: Trajectory, traj2: Trajectory):
-
+def compare_trajectories(traj1: Trajectory, traj2: Trajectory, headless: bool = False) -> dict[str, float]:
+    
     if traj1.child_frame != traj2.child_frame:
-        raise ValueError("Trajectories have different child frames")
+        raise ValueError("Trajectories have different child frames, got {} and {}".format(traj1.child_frame, traj2.child_frame))
     if traj1.parent_frame != traj2.parent_frame:
-        raise ValueError("Trajectories have different parent frames")
+        raise ValueError("Trajectories have different parent frames, got {} and {}".format(traj1.parent_frame, traj2.parent_frame))
 
     # align the two trajectories
     # traj1 = traj1.spatial_align(traj2, orientation=False)
@@ -44,28 +44,28 @@ def compare_trajectories(traj1: Trajectory, traj2: Trajectory):
         acc = acc.float().mean().item()
         data[f"acc_{100*t:.0f}cm_{r}°"] = acc
 
+    if not headless:
+        # create plot, with 3 subplots using plotly
+        fig = make_subplots(rows=3, cols=1, subplot_titles=("Translation", "Translation", "Rotation"), specs =
+            [[{"type": "scatter3d"}], [{"type": "xy"}], [{"type": "xy"}]],
+        )
 
-    # create plot, with 3 subplots using plotly
-    fig = make_subplots(rows=3, cols=1, subplot_titles=("Translation", "Translation", "Rotation"), specs =
-        [[{"type": "scatter3d"}], [{"type": "xy"}], [{"type": "xy"}]],
-    )
+        # set Title
+        fig.update_layout(title=f"Trajectory Comparison from {traj1.parent_frame} to {traj1.child_frame}")
 
-    # set Title
-    fig.update_layout(title=f"Trajectory Comparison from {traj1.parent_frame} to {traj1.child_frame}")
+        fig  = traj1.show(fig=fig, show=False, line_color="blue", show_frames=True, trace_kwargs={"row": 1, "col": 1}, time_as_color = True, colorscale="Viridis")
+        fig = traj2.show(fig=fig, show=False, line_color="red", show_frames=True, trace_kwargs={"row": 1, "col": 1}, time_as_color = True, colorscale="Viridis")
 
-    fig  = traj1.show(fig=fig, show=False, line_color="blue", show_frames=True, trace_kwargs={"row": 1, "col": 1}, time_as_color = True, colorscale="Viridis")
-    fig = traj2.show(fig=fig, show=False, line_color="red", show_frames=True, trace_kwargs={"row": 1, "col": 1}, time_as_color = True, colorscale="Viridis")
+        fig.add_trace(
+            go.Scatter(x=relative_trajectory.timesteps, y=relative_trajectory.positions.norm(dim=1), mode="lines", name="Translation Error"),
+            row=2, col=1
+        )
 
-    fig.add_trace(
-        go.Scatter(x=relative_trajectory.timesteps, y=relative_trajectory.positions.norm(dim=1), mode="lines", name="Translation Error"),
-        row=2, col=1
-    )
-
-    fig.add_trace(
-        go.Scatter(x=relative_trajectory.timesteps, y=relative_rotation_vector, mode="lines", name="Rotation Error"),
-        row=3, col=1
-    )
-    fig.show()
+        fig.add_trace(
+            go.Scatter(x=relative_trajectory.timesteps, y=relative_rotation_vector, mode="lines", name="Rotation Error"),
+            row=3, col=1
+        )
+        fig.show()
 
     table = PrettyTable()
     table.field_names = ["Property", "Value"]
