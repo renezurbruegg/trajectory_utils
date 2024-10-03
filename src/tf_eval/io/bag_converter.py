@@ -1,25 +1,21 @@
 from __future__ import annotations
 
 
-import rosbag
+from pathlib import Path
+
+from rosbags.highlevel import AnyReader
 import os
 import pandas as pd
 from tf_eval.types import TfRecord
 import torch
 from tf_eval.trajectory import Trajectory
-
 from prettytable import PrettyTable
 
-def _remove_slash_from_frames(msg):
-    msg.header.frame_id = msg.header.frame_id.strip("/")
-    msg.child_frame_id = msg.child_frame_id.strip("/")
-    return msg
-
-def _tf_to_dict(tf_message) -> TfRecord:
+def tf_to_dict(tf_message):
     return {
-        "timestamp": tf_message.header.stamp.to_nsec()*1e-9,
-        "parent_frame": tf_message.header.frame_id,
-        "child_frame": tf_message.child_frame_id,
+        "timestamp": tf_message.header.stamp.sec + tf_message.header.stamp.nanosec * 1e-9,
+        "parent_frame": tf_message.header.frame_id.strip("/"),
+        "child_frame": tf_message.child_frame_id.strip("/"),
         "translation_x": tf_message.transform.translation.x,
         "translation_y": tf_message.transform.translation.y,
         "translation_z": tf_message.transform.translation.z,
@@ -29,25 +25,34 @@ def _tf_to_dict(tf_message) -> TfRecord:
         "rotation_w": tf_message.transform.rotation.w,
     }
 
+
 def convert_rosbag_to_dfs(bag_file: str, output_dir: str = "data", save= True) -> dict[str, pd.DataFrame]:
-    bag = rosbag.Bag(bag_file)
+    # bag = rosbag.Bag(bag_file)
 
+    tf_messages = []
+    # Create reader instance and open for reading.
+    with AnyReader([Path(bag_file)]) as reader:
+        connections = [x for x in reader.connections if x.topic == '/tf']
+        for connection, timestamp, rawdata in reader.messages(connections=connections):
+            msg = reader.deserialize(rawdata, connection.msgtype)
+            
+            for tf in msg.transforms:
+                tf_messages.append(tf_to_dict(tf))
 
-    tf_messages = sorted((_remove_slash_from_frames(tm) for m in bag if m.topic.strip("/") == 'tf' for tm in m.message.transforms),key=lambda tfm: tfm.header.stamp.to_nsec())
     output_dir = os.path.join(output_dir, os.path.basename(bag_file).replace(".bag", ""))
     os.makedirs(output_dir, exist_ok=True)
 
     data = {}
     for tf_message in tf_messages:
-        child_frame = tf_message.child_frame_id
+        child_frame = tf_message["child_frame"]
 
         if child_frame not in data:
             data[child_frame] = []
         else:
-            if data[child_frame][-1]["parent_frame"] != tf_message.header.frame_id:
+            if data[child_frame][-1]["parent_frame"] != tf_message["parent_frame"]:
                 raise ValueError(f"Multiple messages with the same child frame and parent frame found: {tf_message}")
 
-        data[child_frame].append(_tf_to_dict(tf_message))
+        data[child_frame].append(tf_message)
 
 
     table = PrettyTable()
