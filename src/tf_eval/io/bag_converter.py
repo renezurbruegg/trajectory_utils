@@ -6,9 +6,9 @@ from pathlib import Path
 from rosbags.highlevel import AnyReader
 import os
 import pandas as pd
-from tf_eval.types import TfRecord
+from trajectory_utils.types import TfRecord
 import torch
-from tf_eval.trajectory import Trajectory
+from trajectory_utils.trajectory import Trajectory
 from prettytable import PrettyTable
 
 def tf_to_dict(tf_message):

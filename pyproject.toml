@@ -3,7 +3,7 @@ requires = ["flit_core >=2,<4"]
 build-backend = "flit_core.buildapi"
 
 [project]
-name =  "tf_eval"
+name =  "trajectory_utils"
 authors = [
     {name = "Daniel Ciborowski", email = "dciborow@microsoft.com"},
 ]
@@ -48,7 +48,7 @@ test = [
 ]
 
 [tool.flit.module]
-name = "tf_eval"
+name = "trajectory_utils"
 
 [tool.bandit]
 exclude_dirs = ["build","dist","tests","scripts"]

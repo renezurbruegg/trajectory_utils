@@ -6,10 +6,10 @@
 from __future__ import annotations
 
 import torch
-from tf_eval.trajectory import Trajectory
+from trajectory_utils.trajectory import Trajectory
 import numpy as np
 import roma
-from tf_eval.np_reader import trajectory_from_numpy
+from trajectory_utils.np_reader import trajectory_from_numpy
 
 
 
@@ -18,8 +18,8 @@ from tf_eval.np_reader import trajectory_from_numpy
 # parent_frame = ""
 # child_frame = ""
 # print("Read numpy")
-# poses = np.load("/home/zrene/git/tf_eval/data/gt_testing_pred/right_hand_positions.npy")
-# stamps = np.load("/home/zrene/git/tf_eval/data/gt_testing_pred/right_hand_timestamps.npy")
+# poses = np.load("/home/zrene/git/trajectory_utils/data/gt_testing_pred/right_hand_positions.npy")
+# stamps = np.load("/home/zrene/git/trajectory_utils/data/gt_testing_pred/right_hand_timestamps.npy")
 
 # poses = torch.from_numpy(poses).float()
 # orientations = torch.zeros(len(poses), 4).to(poses.device)
@@ -28,11 +28,11 @@ from tf_eval.np_reader import trajectory_from_numpy
 
 # fig = Trajectory(poses, orientations, stamps, parent_frame, child_frame).show(show=False)
 
-# poses2 = np.load("/home/zrene/git/tf_eval/data/gt_testing_pred/trajectory.npy")
+# poses2 = np.load("/home/zrene/git/trajectory_utils/data/gt_testing_pred/trajectory.npy")
 # poses2 = torch.from_numpy(poses2).float()
 # orientations = roma.rotmat_to_unitquat(poses2[..., :3, :3])
 # positions = poses2[:, :3, -1]
-# stamps2 = np.load("/home/zrene/git/tf_eval/data/gt_testing_pred/timestamps.npy")
+# stamps2 = np.load("/home/zrene/git/trajectory_utils/data/gt_testing_pred/timestamps.npy")
 # stamps2 = torch.from_numpy(stamps2).to(dtype=torch.float64) / 1000 
 # # 
 # fig = Trajectory(positions, orientations, stamps2, parent_frame, child_frame+"_2").show(fig, show=False, line_color = "red")
@@ -41,9 +41,9 @@ from tf_eval.np_reader import trajectory_from_numpy
 
 
 def check_read_numpy():
-    hand_traj = trajectory_from_numpy("/home/zrene/git/tf_eval/data/gt_testing_pred/right_hand_positions.npy", "/home/zrene/git/tf_eval/data/gt_testing_pred/right_hand_timestamps.npy", child_frame="right_hand", parent_frame="world")
-    glasses_traj = trajectory_from_numpy("/home/zrene/git/tf_eval/data/gt_testing_pred/trajectory.npy", 
-    "/home/zrene/git/tf_eval/data/gt_testing_pred/timestamps.npy", child_frame="glasses", parent_frame="world")
+    hand_traj = trajectory_from_numpy("/home/zrene/git/trajectory_utils/data/gt_testing_pred/right_hand_positions.npy", "/home/zrene/git/trajectory_utils/data/gt_testing_pred/right_hand_timestamps.npy", child_frame="right_hand", parent_frame="world")
+    glasses_traj = trajectory_from_numpy("/home/zrene/git/trajectory_utils/data/gt_testing_pred/trajectory.npy", 
+    "/home/zrene/git/trajectory_utils/data/gt_testing_pred/timestamps.npy", child_frame="glasses", parent_frame="world")
     
     fig = hand_traj.show(show=False)
     fig = glasses_traj.show(fig, show=False, line_color = "red")

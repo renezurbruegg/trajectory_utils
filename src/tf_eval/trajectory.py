@@ -4,7 +4,7 @@ from __future__ import annotations
 import torch
 from typing import Callable, Sequence, TypeVar
 import roma
-from tf_eval.utils.rotation import unitquat_slerp
+from trajectory_utils.utils.rotation import unitquat_slerp
 import plotly.graph_objects as go
 
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 import torch
 
 import roma
-from tf_eval.trajectory import Trajectory
+from trajectory_utils.trajectory import Trajectory
 from prettytable import PrettyTable
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots

@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import torch
-from tf_eval.io.bag_converter import load_trajectories_from_bag
-from tf_eval.eval import compare_trajectories
-from tf_eval.trajectory import Trajectory
-from tf_eval.io.np_reader import trajectory_from_numpy
-from tf_eval.utils.colors import get_colormap
+from trajectory_utils.io.bag_converter import load_trajectories_from_bag
+from trajectory_utils.eval import compare_trajectories
+from trajectory_utils.trajectory import Trajectory
+from trajectory_utils.io.np_reader import trajectory_from_numpy
+from trajectory_utils.utils.colors import get_colormap
 import os
 
 import numpy as np

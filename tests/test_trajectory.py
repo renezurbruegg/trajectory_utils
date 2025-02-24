@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 import torch
-from tf_eval.trajectory import Trajectory
+from trajectory_utils.trajectory import Trajectory
 
 
 def properties_test():
